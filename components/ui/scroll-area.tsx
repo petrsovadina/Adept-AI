@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -35,6 +36,9 @@ export interface ScrollAreaProps
     VariantProps<typeof scrollAreaVariants> {
   scrollHideDelay?: number;
   type?: "auto" | "always" | "scroll" | "hover";
+  className?: string;
+  children?: React.ReactNode;
+  orientation?: "vertical" | "horizontal" | "both";
 }
 
 const ScrollArea = React.forwardRef<
@@ -85,6 +89,8 @@ interface ScrollBarProps
   > {
   scrollHideDelay?: number;
   type?: "auto" | "always" | "scroll" | "hover";
+  orientation?: "vertical" | "horizontal";
+  className?: string;
 }
 
 const ScrollBar = React.forwardRef<

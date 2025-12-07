@@ -2,10 +2,11 @@
 import React, { useState } from 'react';
 import { ProjectSpec, RefinerState } from '../types';
 import { analyzeIdeaAndGenerateQuestions, generateProjectSpec } from '../services/geminiService';
-import { Loader2, ArrowRight, CheckCircle, AlertCircle, FileText, Cpu, Target, Database } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, AlertCircle, FileText, Cpu, Target, Database, BrainCircuit, Zap } from 'lucide-react';
 
 interface RefinerProps {
   onSave: (spec: ProjectSpec) => void;
+  apiKey: string;
 }
 
 const initialRefinerState: RefinerState = {
@@ -17,24 +18,31 @@ const initialRefinerState: RefinerState = {
   generatedSpec: null,
 };
 
-export const Refiner: React.FC<RefinerProps> = ({ onSave }) => {
+export const Refiner: React.FC<RefinerProps> = ({ onSave, apiKey }) => {
   const [state, setState] = useState<RefinerState>(initialRefinerState);
   const [error, setError] = useState<string | null>(null);
+  const [useThinking, setUseThinking] = useState<boolean>(false);
 
   const handleInitialSubmit = async () => {
     if (!state.rawInput.trim()) return;
+    if (!apiKey) {
+      setError("Chybí API klíč. Prosím zadejte ho v nastavení nebo obnovte stránku.");
+      return;
+    }
+
     setState(prev => ({ ...prev, isAnalyzing: true }));
     setError(null);
     try {
-      const questions = await analyzeIdeaAndGenerateQuestions(state.rawInput);
+      // Step 1 always uses Flash for speed
+      const questions = await analyzeIdeaAndGenerateQuestions(apiKey, state.rawInput);
       setState(prev => ({
         ...prev,
         questions,
         step: 1,
         isAnalyzing: false
       }));
-    } catch (err) {
-      setError("Chyba při analýze nápadu. Zkontrolujte API klíč a zkuste to znovu.");
+    } catch (err: any) {
+      setError(err.message || "Chyba při analýze nápadu.");
       setState(prev => ({ ...prev, isAnalyzing: false }));
     }
   };
@@ -53,18 +61,23 @@ export const Refiner: React.FC<RefinerProps> = ({ onSave }) => {
   };
 
   const handleGenerateSpec = async () => {
+    if (!apiKey) {
+      setError("Chybí API klíč.");
+      return;
+    }
+
     setState(prev => ({ ...prev, isAnalyzing: true }));
     setError(null);
     try {
-      const spec = await generateProjectSpec(state.rawInput, state.answers);
+      const spec = await generateProjectSpec(apiKey, state.rawInput, state.answers, useThinking);
       setState(prev => ({
         ...prev,
         generatedSpec: spec,
         step: 4, // Final Review Step
         isAnalyzing: false
       }));
-    } catch (err) {
-      setError("Nepodařilo se vygenerovat specifikaci.");
+    } catch (err: any) {
+      setError(err.message || "Nepodařilo se vygenerovat specifikaci.");
       setState(prev => ({ ...prev, isAnalyzing: false }));
     }
   };
@@ -89,7 +102,28 @@ export const Refiner: React.FC<RefinerProps> = ({ onSave }) => {
     <div className="flex flex-col lg:flex-row gap-6 h-full min-h-[calc(100vh-100px)]">
       {/* Main Form Area */}
       <div className="flex-1 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">The Refiner</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-slate-800">The Refiner</h2>
+          {state.step === 3 && (
+            <div className="flex items-center space-x-2 bg-slate-100 p-1 rounded-lg">
+              <button 
+                onClick={() => setUseThinking(false)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center transition-all ${!useThinking ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                <Zap size={14} className="mr-1.5" />
+                Rychlý (Flash)
+              </button>
+              <button 
+                onClick={() => setUseThinking(true)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center transition-all ${useThinking ? 'bg-indigo-600 shadow text-white' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                <BrainCircuit size={14} className="mr-1.5" />
+                Deep Thinking
+              </button>
+            </div>
+          )}
+        </div>
+        
         {renderStepIndicator()}
         
         {error && (
@@ -116,6 +150,11 @@ export const Refiner: React.FC<RefinerProps> = ({ onSave }) => {
               {state.isAnalyzing ? <Loader2 className="animate-spin mr-2" /> : <Target className="mr-2" />}
               Spustit Refinaci
             </button>
+            {!apiKey && (
+               <p className="text-xs text-amber-600 mt-2">
+                 * Pro spuštění je nutné zadat API klíč v hlavním menu.
+               </p>
+            )}
           </div>
         )}
 
@@ -129,6 +168,7 @@ export const Refiner: React.FC<RefinerProps> = ({ onSave }) => {
                   type="text"
                   className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500"
                   onChange={(e) => handleAnswerChange('problemVision', q, e.target.value)}
+                  placeholder="Vaše odpověď..."
                 />
               </div>
             ))}
@@ -175,15 +215,31 @@ export const Refiner: React.FC<RefinerProps> = ({ onSave }) => {
                 />
               </div>
             ))}
+
+            {/* Thinking Mode Info Box */}
+            {useThinking && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-start gap-3">
+                <BrainCircuit className="text-indigo-600 mt-1 shrink-0" size={20} />
+                <div>
+                  <h4 className="text-sm font-bold text-indigo-900">Deep Thinking Aktivováno (Gemini 3 Pro)</h4>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Model bude důkladně přemýšlet o architektuře a rizicích. Generování může trvat déle (30-60s), ale výsledek bude kvalitnější.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between pt-4">
                <button onClick={() => setState(prev => ({ ...prev, step: 2 }))} className="px-6 py-2 text-slate-600 hover:text-slate-900">Zpět</button>
                <button 
                 onClick={handleGenerateSpec} 
                 disabled={state.isAnalyzing}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center shadow-lg shadow-indigo-200"
+                className={`px-6 py-2 text-white rounded-lg flex items-center shadow-lg transition-all
+                  ${useThinking ? 'bg-indigo-700 hover:bg-indigo-800 shadow-indigo-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'}
+                `}
                >
-                {state.isAnalyzing ? <Loader2 className="animate-spin mr-2" /> : <Cpu className="mr-2" />}
-                Generovat Specifikaci
+                {state.isAnalyzing ? <Loader2 className="animate-spin mr-2" /> : (useThinking ? <BrainCircuit className="mr-2" /> : <Cpu className="mr-2" />)}
+                {state.isAnalyzing ? (useThinking ? 'Důkladně přemýšlím...' : 'Generuji...') : 'Generovat Specifikaci'}
               </button>
             </div>
           </div>

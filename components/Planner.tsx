@@ -2,16 +2,17 @@
 import React, { useState } from 'react';
 import { Project, Horizon, Swimlane } from '../types';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip as RechartsTooltip, Cell, ReferenceLine } from 'recharts';
-import { LayoutGrid, Kanban, Info, Edit2, Presentation } from 'lucide-react';
+import { LayoutGrid, Kanban, Info, Edit2, Presentation, Trash2, Save } from 'lucide-react';
 import { RoadmapCard, RoadmapItem } from './ui/roadmap-card';
 import { Timeline, TimelineItem } from './ui/timeline';
 
 interface PlannerProps {
   projects: Project[];
   onUpdateProject: (project: Project) => void;
+  onDeleteProject: (id: string) => void;
 }
 
-export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) => {
+export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject, onDeleteProject }) => {
   const [viewMode, setViewMode] = useState<'roadmap' | 'matrix' | 'templates'>('roadmap');
   const [editingProject, setEditingProject] = useState<string | null>(null);
 
@@ -35,6 +36,12 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
     };
     // Recalculate generic score
     onUpdateProject(calculateScores(updated));
+  };
+  
+  const handleTitleChange = (id: string, newTitle: string) => {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+    onUpdateProject({ ...project, title: newTitle });
   };
 
   const getRiskColor = (diceScore: number) => {
@@ -73,7 +80,7 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
                       <div key={p.id} className="bg-white p-3 rounded shadow-sm border border-slate-200 mb-2 cursor-pointer hover:shadow-md transition-shadow group relative">
                         <div className="flex justify-between items-start mb-2">
                            <span className="font-semibold text-sm text-slate-800 line-clamp-2">{p.title}</span>
-                           <button onClick={() => setEditingProject(p.id)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500">
+                           <button onClick={() => setEditingProject(p.id)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-opacity">
                              <Edit2 size={14} />
                            </button>
                         </div>
@@ -87,20 +94,41 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
                            />
                         </div>
                         {editingProject === p.id && (
-                          <div className="absolute top-full left-0 z-50 bg-white p-4 shadow-xl rounded-lg border border-slate-200 w-64 mt-2">
-                            <h5 className="text-xs font-bold text-slate-500 mb-2">Upravit Metriky</h5>
-                            <div className="space-y-2">
-                              <label className="text-xs flex justify-between">Dosah (Reach) <input type="number" className="w-12 border rounded px-1" value={p.rice.reach} onChange={e => handleScoreChange(p.id, 'rice', 'reach', +e.target.value)}/></label>
-                              <label className="text-xs flex justify-between">Dopad (Impact) <input type="number" className="w-12 border rounded px-1" value={p.rice.impact} onChange={e => handleScoreChange(p.id, 'rice', 'impact', +e.target.value)}/></label>
-                              <label className="text-xs flex justify-between">Úsilí (Effort) <input type="number" className="w-12 border rounded px-1" value={p.rice.effort} onChange={e => handleScoreChange(p.id, 'rice', 'effort', +e.target.value)}/></label>
-                              <div className="h-px bg-slate-100 my-2"></div>
-                              <label className="text-xs flex justify-between">Horizont
-                                <select className="w-24 border rounded px-1" value={p.horizon} onChange={e => onUpdateProject({...p, horizon: e.target.value as Horizon})}>
+                          <div className="absolute top-0 left-0 z-50 bg-white p-4 shadow-xl rounded-lg border border-slate-200 w-72">
+                            <h5 className="text-xs font-bold text-slate-500 mb-3 flex justify-between items-center">
+                              Upravit Projekt
+                              <button onClick={() => onDeleteProject(p.id)} className="text-red-500 hover:text-red-700" title="Smazat projekt">
+                                <Trash2 size={14} />
+                              </button>
+                            </h5>
+                            
+                            <div className="space-y-3">
+                              <label className="text-xs block">
+                                Název
+                                <input 
+                                  type="text" 
+                                  className="w-full border rounded px-2 py-1 mt-1 text-sm" 
+                                  value={p.title} 
+                                  onChange={e => handleTitleChange(p.id, e.target.value)}
+                                />
+                              </label>
+
+                              <div className="h-px bg-slate-100"></div>
+
+                              <label className="text-xs flex justify-between items-center">Dosah (Reach) <input type="number" className="w-16 border rounded px-1" value={p.rice.reach} onChange={e => handleScoreChange(p.id, 'rice', 'reach', +e.target.value)}/></label>
+                              <label className="text-xs flex justify-between items-center">Dopad (Impact) <input type="number" className="w-16 border rounded px-1" value={p.rice.impact} onChange={e => handleScoreChange(p.id, 'rice', 'impact', +e.target.value)}/></label>
+                              <label className="text-xs flex justify-between items-center">Úsilí (Effort) <input type="number" className="w-16 border rounded px-1" value={p.rice.effort} onChange={e => handleScoreChange(p.id, 'rice', 'effort', +e.target.value)}/></label>
+                              
+                              <div className="h-px bg-slate-100"></div>
+                              
+                              <label className="text-xs block">
+                                Horizont
+                                <select className="w-full border rounded px-1 py-1 mt-1 text-sm" value={p.horizon} onChange={e => onUpdateProject({...p, horizon: e.target.value as Horizon})}>
                                   {Object.values(Horizon).map(o => <option key={o} value={o}>{o}</option>)}
                                 </select>
                               </label>
                             </div>
-                            <button onClick={() => setEditingProject(null)} className="w-full mt-3 bg-slate-100 text-xs py-1 rounded hover:bg-slate-200">Zavřít</button>
+                            <button onClick={() => setEditingProject(null)} className="w-full mt-4 bg-slate-100 text-xs py-2 rounded hover:bg-slate-200 font-medium">Hotovo</button>
                           </div>
                         )}
                       </div>
@@ -163,8 +191,8 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
           <h3 className="text-lg font-semibold mb-4 text-slate-800">Šablona 2: Detailní Časová Osa (Timeline)</h3>
           <p className="text-sm text-slate-500 mb-6">Tento formát se používá pro detailní sledování milníků konkrétního projektu.</p>
           <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border">
-            {activeProject && <h4 className="font-bold mb-4">{activeProject.title}</h4>}
-            <Timeline items={timelineItems} variant="spacious" />
+            {activeProject ? <h4 className="font-bold mb-4">{activeProject.title}</h4> : <p className="text-slate-400">Žádný projekt k zobrazení.</p>}
+            {activeProject && <Timeline items={timelineItems} variant="spacious" />}
           </div>
         </section>
       </div>
@@ -188,11 +216,11 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
         <p className="text-xs text-slate-500 mb-4">
           Body představují projekty. Osa X: Úsilí, Osa Y: Dopad. Velikost bodu odpovídá celkovému RICE skóre.
         </p>
-        <div className="flex-1">
+        <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <XAxis type="number" dataKey="x" name="Effort" unit="" label={{ value: 'Úsilí (Effort)', position: 'insideBottom', offset: -10 }} />
-              <YAxis type="number" dataKey="y" name="Impact" unit="" label={{ value: 'Dopad (Impact)', angle: -90, position: 'insideLeft' }} />
+              <XAxis type="number" dataKey="x" name="Effort" unit="" domain={[0, 'auto']} label={{ value: 'Úsilí (Effort)', position: 'insideBottom', offset: -10 }} />
+              <YAxis type="number" dataKey="y" name="Impact" unit="" domain={[0, 'auto']} label={{ value: 'Dopad (Impact)', angle: -90, position: 'insideLeft' }} />
               <ZAxis type="number" dataKey="z" range={[50, 600]} name="Score" />
               <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
                  if (active && payload && payload.length) {
@@ -233,8 +261,8 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
   };
 
   return (
-    <div className="h-full">
-      <div className="flex justify-between items-center mb-6">
+    <div className="h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6 shrink-0">
         <h2 className="text-2xl font-bold text-slate-800">The Planner</h2>
         <div className="flex space-x-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
           <button 
@@ -258,15 +286,17 @@ export const Planner: React.FC<PlannerProps> = ({ projects, onUpdateProject }) =
         </div>
       </div>
 
-      {projects.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-          <Info size={48} className="mx-auto text-slate-300 mb-4" />
-          <p className="text-slate-500 text-lg">Váš backlog je prázdný.</p>
-          <p className="text-slate-400">Použijte "The Refiner" pro vytvoření nové specifikace.</p>
-        </div>
-      ) : (
-        viewMode === 'roadmap' ? renderRoadmap() : viewMode === 'matrix' ? renderMatrix() : renderTemplates()
-      )}
+      <div className="flex-1 overflow-auto">
+        {projects.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+            <Info size={48} className="mx-auto text-slate-300 mb-4" />
+            <p className="text-slate-500 text-lg">Váš backlog je prázdný.</p>
+            <p className="text-slate-400">Použijte "The Refiner" pro vytvoření nové specifikace.</p>
+          </div>
+        ) : (
+          viewMode === 'roadmap' ? renderRoadmap() : viewMode === 'matrix' ? renderMatrix() : renderTemplates()
+        )}
+      </div>
     </div>
   );
 };
